@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block content %}
+    {% for post in posts %}
+        <project class="media content-section">
+          <div class="media-body">
+            <div class="project-metadata">
+              <a class="mr-2" href="#">{{ post.author }}</a>
+              <small class="text-muted">{{ post.date_posted }}</small>
+            </div>
+            <h2><a class="project-title" href="#">{{ post.title }}</a></h2>
+            <p class="project-content">{{ post.content }}</p>
+          </div>
+        </project>
+    {% endfor %}
+{% endblock content %}
