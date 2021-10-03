@@ -1,4 +1,4 @@
-from slack_funnel_app import db, login_manager
+from slack_workflow_app import db, login_manager
 from datetime import datetime
 from flask_login import UserMixin
 from sqlalchemy.orm import relationship
@@ -51,12 +51,14 @@ class Workspace(db.Model):
     start_date = db.Column(db.DateTime(), default=datetime.utcnow)
     token = db.Column(db.String(150), nullable=False, unique=True)
 
-    # many 2 many - Workspace -> WorkspaceMessage <- Message
+    # many 2 many: Workspace -> WorkspaceMessage <- Message
     message = relationship("WorkspaceMessage", backref='workspace')
 
-    # one 2 many - 1 workflow - workspace N
+    # one 2 many: 1 workflow - workspace N
     workflow_id = db.Column(db.Integer, db.ForeignKey('workflows.id'))
     workflow = relationship("Workflow")
+
+    created_by = db.Column(db.String(30), nullable=False)
 
 
 class Workflow(db.Model):
@@ -69,6 +71,8 @@ class Workflow(db.Model):
 
     # one 2 many - 1 workflow - workspace N
     workspace = relationship("Workspace")
+
+    created_by = db.Column(db.String(30), nullable=False)
 
 
 class WorkflowMessage(db.Model):
@@ -96,6 +100,7 @@ class Message(db.Model):
     # many 2 many - Workflow -> WorkflowMessage <- Message
     workflow = relationship("WorkflowMessage", backref='message')
 
+    created_by = db.Column(db.String(30), nullable=False)
 
 class WorkspaceMessage(db.Model):
     __tablename__ = 'workspace_messages'

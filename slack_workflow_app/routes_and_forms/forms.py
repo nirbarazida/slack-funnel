@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, BooleanField
+from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, optional, ValidationError
-from slack_funnel_app.database.schema import UserTable
+from slack_workflow_app.database.schema import UserTable, Workspace, Workflow, WorkflowMessage, Message, WorkspaceMessage
 
 #todo: add validate step to all relevent forms - add step
 
@@ -35,6 +35,20 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Login')
 
 
-class NewStageForm(FlaskForm):
-    name = StringField('Stage name', validators=[DataRequired(), Length(min=2, max=20)])
-    message_content = StringField('Message content', validators=[DataRequired(), Length(min=2)])
+class NewMessageForm(FlaskForm):
+    message_name = StringField('Message name', validators=[DataRequired(), Length(min=2, max=30)])
+    message = TextAreaField('Message', validators=[DataRequired(), Length(min=2, max=2000)])
+    submit = SubmitField('Save')
+
+    def validate_message_name(self, message_name):
+        user = Message.query.filter_by(name=message_name.data).first()
+        if user:
+            raise ValidationError('That name is taken. Please choose a different one.')
+
+    def validate_message(self, message):
+        message = Message.query.filter_by(message=message.data).first()
+        if message:
+            raise ValidationError(f'This message exists in the data base under the name - "{message.name}"')
+
+
+

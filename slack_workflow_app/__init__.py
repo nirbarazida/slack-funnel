@@ -2,7 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask import Flask
 from flask_bcrypt import Bcrypt
 import os
-from slack_funnel_app.const import DB_PATH
+from slack_workflow_app.const import DB_PATH
 from flask_login import LoginManager
 
 app = Flask(__name__)
@@ -17,7 +17,7 @@ login_manager.login_message_category = 'info'
 
 
 # Do not move up - it needs to be called AFTER the app is created.
-from slack_funnel_app.routes_and_forms import routes
+from slack_workflow_app.routes_and_forms import routes
 
 if not os.path.exists(DB_PATH):
     db.create_all()
