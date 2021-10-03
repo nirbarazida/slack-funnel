@@ -3,6 +3,7 @@ from slack_workflow_app.routes_and_forms.forms import RegistrationForm, LoginFor
 from slack_workflow_app import app, db, bcrypt
 from slack_workflow_app.database.schema import UserTable, Workspace, Workflow, WorkflowMessage, Message, WorkspaceMessage
 from flask_login import login_user, current_user, logout_user, login_required
+from datetime import datetime
 
 # todo: use bcrypt for the tokens
 # todo: add login_required to relevent pages
@@ -85,7 +86,7 @@ def account():
 def add_message():
     form = NewMessageForm()
     if form.validate_on_submit():
-        message = Message(name=form.message_name.data, message=form.message.data, created_by=current_user)
+        message = Message(name=form.message_name.data, message=form.message.data, created_by=current_user.id)
         db.session.add(message)
         db.session.commit()
         flash('Your message has been created!', 'success')
@@ -95,6 +96,45 @@ def add_message():
 
 
 ############# API ###############
+
+def validate_add_message_request(request): # todo: Simon can it be done cleaner?
+    """Validation function for the API request"""
+
+    message_json = request.get_json()
+    # Workflow name exist in DB
+
+    if Message.query.filter_by(name=message_json["message_name"]).first():
+        return {"status": False, "message": "Message name already exist in the database"}
+
+    if Message.query.filter_by(name=message_json["message_text"]).first():
+        return {"status": False, "message": "Message content already exist in the database"}
+
+    return {"status":True}
+
+@app.route("/add_message/api", methods=['GET', 'POST'])
+# @login_required # todo: Simon - how to create a post with user Oauth?
+def add_message_api():
+
+    input_validation = validate_add_message_request(request)
+
+    if input_validation["status"] == False:
+        return input_validation["message"]
+
+
+    if request.is_json:
+        message_json = request.get_json()
+        message = Message(name=message_json["message_name"], message=message_json["message_text"],
+                          created_by=1)#current_user) # todo: undo after Oauth fix
+        db.session.add(message)
+        db.session.commit()
+        message_id = Message.query.filter_by(name=message_json["message_name"]).first().id
+
+        return f"Message created successfully. It's id is: {message_id}"
+
+    else:
+        return redirect(url_for('home'))  # todo: show informative message before redirect
+
+
 
 
 def validate_add_workflow_request(request): # todo: Simon can it be done cleaner?
@@ -148,13 +188,57 @@ def add_workflow():
             db.session.add(workflowmessage)
             db.session.commit()
 
-        return f"Workflow was created successfully. It's id is: {workflow_id}"
+        return f"Workflow created successfully. It's id is: {workflow_id}"
     else:
         return redirect(url_for('home'))  # todo: show informative message before redirect
+
+
+
+def validate_add_workspace_request(request): # todo: Simon can it be done cleaner?
+    """Validation function for the API request"""
+
+    workspace_json = request.get_json()
+    # Workflow name exist in DB
+
+    if Workspace.query.filter_by(name=workspace_json["workspace_name"]).first():
+        return {"status": False, "message": "workspace name already exist in the database"}
+
+    if Workflow.query.filter_by(id=workspace_json["workflow_id"]).first() is None:
+        return {"status": False, "message": "workflow id doesn't exist in the database"}
+
+    return {"status": True}
+
+def create_workspace_messages(workspace_id,start_time, workflow_id):
+    workflow_messages = WorkflowMessage.query.filter_by(workflow_id=workflow_id)
+    for meesage in workflow_messages:
+        workspace_message = WorkspaceMessage(time_utc=start_time+)
+
 
 
 @app.route("/add_workspace/api", methods=['GET', 'POST'])
 # @login_required # todo: Simon - how to create a post with user Oauth?
 def add_workspace():
+    """
+    {"workspace_name":"", "start_date":"%d/%m/%y %H:%M","token":"",workflow_id:""}
+    :return:
+    """
+    input_validation = validate_add_workspace_request(request)
+
+    if input_validation["status"] == False:
+        return input_validation["message"]
+
     if request.is_json:
-        workflow_json = request.get_json()
+        workspace_json = request.get_json()
+
+        hashed_token = bcrypt.generate_password_hash(workspace_json["start_date"]).decode('utf-8')
+        workspace = Workspace(name=workspace_json["workspace_name"],
+                             start_date=datetime.strptime(workspace_json["start_date"], '%d/%m/%y %H:%M'),token=hashed_token,
+                             created_by=1)  # current_user.id) # todo: undo after Oauth fix
+        db.session.add(workspace)
+        db.session.commit()
+
+        workspace_id = Workspace.query.filter_by(name=workspace_json["workspace_name"]).first().id
+
+        create_workspace_meages()
+
+        return f"Workspace created successfully. It's id is: {workspace_id}"
