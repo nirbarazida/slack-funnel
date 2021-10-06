@@ -56,7 +56,7 @@ class Workspace(db.Model):
 
     # one 2 many: 1 workflow - workspace N
     workflow_id = db.Column(db.Integer, db.ForeignKey('workflows.id'))
-    workflow = relationship("Workflow")
+    workflow = relationship("Workflow",back_populates="workspace")
 
     created_by = db.Column(db.String(30), nullable=False)
 
@@ -70,7 +70,7 @@ class Workflow(db.Model):
     message = relationship("WorkflowMessage", backref='workflow')
 
     # one 2 many - 1 workflow - workspace N
-    workspace = relationship("Workspace")
+    workspace = relationship("Workspace",back_populates="workflow")
 
     created_by = db.Column(db.String(30), nullable=False)
 
@@ -114,130 +114,3 @@ class WorkspaceMessage(db.Model):
 
     # one 2 one - WorkflowMessage (ID) - WorkspaceMessage (NonID)
     workflow_message_id = db.Column(db.Integer(), db.ForeignKey('workflow_messages.id'))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# class Workspace(db.Model):
-#     __tablename__ = 'workspaces'
-#     id = db.Column(db.Integer, primary_key=True)
-#     name = db.Column(db.String(30), nullable=False, unique=True)
-#     start_date = db.Column(db.DateTime(), default=datetime.utcnow)
-#     token = db.Column(db.String(150), nullable=False)
-#     workspace_step = relationship("WorkspaceStep") # check
-#
-#     workflow_id = db.Column(db.Integer, db.ForeignKey('workflows.id')) # check
-#     workflow = relationship("Workflow") # check
-#
-#
-#
-# class WorkspaceStep(db.Model):
-#     __tablename__ = 'workspace_steps'
-#     id = db.Column(db.Integer, primary_key=True)
-#
-#     workspace_id = db.Column(db.Integer, db.ForeignKey('workspaces.id')) # check
-#     workspace = relationship("Workspace") # check
-#
-#     step_id = db.Column(db.Integer, db.ForeignKey('steps.id'))  # check
-#     step = relationship("Step")  # check
-#
-#     workflow_step_id = db.Column(db.Integer(), db.ForeignKey('workflows_steps.id')) # check
-#
-#     time_utc = db.Column(db.DateTime(), nullable=False)
-#     status = db.Column(db.Boolean, default=0)  # todo check that it works + fill with 0 or 1 not T/F
-#
-# class WorkflowStep(db.Model):
-#     __tablename__ = 'workflows_steps'
-#     id = db.Column(db.Integer, primary_key=True)
-#
-#     workflow_id = db.Column(db.Integer, db.ForeignKey('workflows.id')) # check
-#     workflow = relationship("Workflow") # check
-#
-#     step_id = db.Column(db.String(30), db.ForeignKey('steps.name'))  # check
-#     step = relationship("Step") # check
-#
-#     time_from_start_days = db.Column(db.Integer, nullable=False)
-#     time_from_start_hours = db.Column(db.Integer, nullable=False)
-#
-#     workspace_step = relationship('WorkspaceStep', backref='workspacestep', uselist=False) # check
-#
-# class Workflow(db.Model):
-#     __tablename__ = 'workflows'
-#     id = db.Column(db.Integer, primary_key=True)
-#     name = db.Column(db.String(30), nullable=False, unique=True)
-#     workspace = relationship("Workspace") # check
-#     workflow_step = relationship("WorkflowStep") # check
-#
-#
-# class Step(db.Model):
-#     __tablename__ = 'steps'
-#     id = db.Column(db.Integer, primary_key=True)
-#     name = db.Column(db.String(30), nullable=False, unique=True)
-#     message = db.Column(db.String(2000), nullable=False, unique=True)
-#     workflow_step = relationship("WorkflowStep") # check
-#     workspace_step = relationship("WorkspaceStep") #check
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

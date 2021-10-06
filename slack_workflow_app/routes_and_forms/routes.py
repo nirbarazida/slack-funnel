@@ -1,13 +1,14 @@
-from flask import render_template, url_for, flash, redirect, request,jsonify
+from flask import render_template, url_for, flash, redirect, request, jsonify
 from slack_workflow_app.routes_and_forms.forms import RegistrationForm, LoginForm, NewMessageForm
 from slack_workflow_app import app, db, bcrypt
-from slack_workflow_app.database.schema import UserTable, Workspace, Workflow, WorkflowMessage, Message, WorkspaceMessage
+from slack_workflow_app.database.schema import UserTable, Workspace, Workflow, WorkflowMessage, Message, \
+    WorkspaceMessage
 from flask_login import login_user, current_user, logout_user, login_required
-from datetime import datetime
+from datetime import datetime, timedelta
+from functools import wraps
 
 # todo: use bcrypt for the tokens
 # todo: add login_required to relevent pages
-
 
 
 posts = [
@@ -94,10 +95,25 @@ def add_message():
     return render_template('add_message/add_message.html', title='New Message', form=form, legend='New Message')
 
 
-
 ############# API ###############
 
-def validate_add_message_request(request): # todo: Simon can it be done cleaner?
+def api_auth(f):
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+
+        if auth:
+            user = UserTable.query.filter_by(username=auth.username).first()
+            if user and bcrypt.check_password_hash(user.password, auth.password):
+                return f(*args, **kwargs)
+
+        return 'Could not verify your login information. Please add auth=(username, password) to your request'
+
+    return decorated
+
+
+def validate_add_message_request(request):  # todo: Simon can it be done cleaner?
     """Validation function for the API request"""
 
     message_json = request.get_json()
@@ -106,38 +122,42 @@ def validate_add_message_request(request): # todo: Simon can it be done cleaner?
     if Message.query.filter_by(name=message_json["message_name"]).first():
         return {"status": False, "message": "Message name already exist in the database"}
 
-    if Message.query.filter_by(name=message_json["message_text"]).first():
+    if Message.query.filter_by(message=message_json["message_text"]).first():
         return {"status": False, "message": "Message content already exist in the database"}
 
-    return {"status":True}
+    return {"status": True}
 
-@app.route("/add_message/api", methods=['GET', 'POST'])
-# @login_required # todo: Simon - how to create a post with user Oauth?
+
+
+
+@app.route("/add_message/api", methods=['POST'])
+@api_auth
 def add_message_api():
-
     input_validation = validate_add_message_request(request)
 
     if input_validation["status"] == False:
         return input_validation["message"]
 
 
+
     if request.is_json:
         message_json = request.get_json()
+        user = UserTable.query.filter_by(username=request.authorization.username).first()
+
         message = Message(name=message_json["message_name"], message=message_json["message_text"],
-                          created_by=1)#current_user) # todo: undo after Oauth fix
+                          created_by=user.id)
         db.session.add(message)
         db.session.commit()
+
         message_id = Message.query.filter_by(name=message_json["message_name"]).first().id
 
         return f"Message created successfully. It's id is: {message_id}"
 
     else:
-        return redirect(url_for('home'))  # todo: show informative message before redirect
+        return f"Please add a proper json with message_name, message_text"
 
 
-
-
-def validate_add_workflow_request(request): # todo: Simon can it be done cleaner?
+def validate_add_workflow_request(request):  # todo: Simon can it be done cleaner?
     """Validation function for the API request"""
 
     workflow_json = request.get_json()
@@ -151,11 +171,11 @@ def validate_add_workflow_request(request): # todo: Simon can it be done cleaner
         if Message.query.filter_by(id=message['message_id']).first() is None:
             return {"status": False, "message": "message doesn't exist in the database"}
 
-    return {"status":True}
+    return {"status": True}
 
 
 @app.route("/add_workflow/api", methods=['GET', 'POST'])
-# @login_required # todo: Simon - how to create a post with user Oauth?
+@api_auth
 def add_workflow():
     """
     import requests
@@ -173,9 +193,11 @@ def add_workflow():
         return input_validation["message"]
 
     if request.is_json:
+        user = UserTable.query.filter_by(username=request.authorization.username).first()
+
         workflow_json = request.get_json()
         workflow = Workflow(name=workflow_json["workflow_name"],
-                            created_by=1)  # current_user.id) # todo: undo after Oauth fix
+                            created_by=user.id)
         db.session.add(workflow)
         db.session.commit()
 
@@ -193,8 +215,7 @@ def add_workflow():
         return redirect(url_for('home'))  # todo: show informative message before redirect
 
 
-
-def validate_add_workspace_request(request): # todo: Simon can it be done cleaner?
+def validate_add_workspace_request(request):  # todo: Simon can it be done cleaner?
     """Validation function for the API request"""
 
     workspace_json = request.get_json()
@@ -208,15 +229,27 @@ def validate_add_workspace_request(request): # todo: Simon can it be done cleane
 
     return {"status": True}
 
-def create_workspace_messages(workspace_id,start_time, workflow_id):
-    workflow_messages = WorkflowMessage.query.filter_by(workflow_id=workflow_id)
-    for meesage in workflow_messages:
-        workspace_message = WorkspaceMessage(time_utc=start_time+)
 
+def create_workspace_messages(workspace_id, start_time, workflow_id):
+    workflow_messages = WorkflowMessage.query.filter_by(workflow_id=workflow_id)
+
+    for workflow_meesage in workflow_messages:
+
+        execute_time = start_time + timedelta(days=workflow_meesage.time_from_start_days,
+                                              hours=workflow_meesage.time_from_start_hours)
+
+        if execute_time < datetime.utcnow() + timedelta(minutes=1):
+            # todo: add logic role
+            pass
+        else:
+            workspace_message = WorkspaceMessage(time_utc=execute_time, status=0,
+                                                 workspace_id=workspace_id, message_id=workflow_meesage.id,
+                                                 workflow_message_id=workflow_meesage.id) # todo check status =0 and not False
+            db.session.add(workspace_message)
 
 
 @app.route("/add_workspace/api", methods=['GET', 'POST'])
-# @login_required # todo: Simon - how to create a post with user Oauth?
+@api_auth
 def add_workspace():
     """
     {"workspace_name":"", "start_date":"%d/%m/%y %H:%M","token":"",workflow_id:""}
@@ -228,17 +261,21 @@ def add_workspace():
         return input_validation["message"]
 
     if request.is_json:
-        workspace_json = request.get_json()
+        user = UserTable.query.filter_by(username=request.authorization.username).first()
 
+        workspace_json = request.get_json()
+        workspace_start_time = datetime.strptime(workspace_json["start_date"], '%d/%m/%y %H:%M')
         hashed_token = bcrypt.generate_password_hash(workspace_json["start_date"]).decode('utf-8')
         workspace = Workspace(name=workspace_json["workspace_name"],
-                             start_date=datetime.strptime(workspace_json["start_date"], '%d/%m/%y %H:%M'),token=hashed_token,
-                             created_by=1)  # current_user.id) # todo: undo after Oauth fix
+                              start_date=workspace_start_time,
+                              token=hashed_token,
+                              created_by=user.id)
         db.session.add(workspace)
-        db.session.commit()
+
 
         workspace_id = Workspace.query.filter_by(name=workspace_json["workspace_name"]).first().id
 
-        create_workspace_meages()
+        create_workspace_messages(workspace_id,workspace_start_time,workspace_json["workflow_id"])
 
-        return f"Workspace created successfully. It's id is: {workspace_id}"
+        db.session.commit()
+        return f"Workspace created successfully. It's id is: {workspace_id}, and it's messages id are" #todo: change
