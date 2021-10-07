@@ -84,7 +84,7 @@ def account():
 
 @app.route("/add_message", methods=['GET', 'POST'])
 @login_required
-def add_message():
+def add_message():  # todo: add channel and direct_user_email
     form = NewMessageForm()
     if form.validate_on_submit():
         message = Message(name=form.message_name.data, message=form.message.data, created_by=current_user.id)
@@ -98,7 +98,6 @@ def add_message():
 ############# API ###############
 
 def api_auth(f):
-
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
@@ -128,9 +127,7 @@ def validate_add_message_request(request):  # todo: Simon can it be done cleaner
     return {"status": True}
 
 
-
-
-@app.route("/add_message/api", methods=['POST'])
+@app.route("/api/add_message", methods=['POST'])
 @api_auth
 def add_message_api():
     input_validation = validate_add_message_request(request)
@@ -138,14 +135,15 @@ def add_message_api():
     if input_validation["status"] == False:
         return input_validation["message"]
 
-
-
     if request.is_json:
         message_json = request.get_json()
         user = UserTable.query.filter_by(username=request.authorization.username).first()
-
-        message = Message(name=message_json["message_name"], message=message_json["message_text"],
-                          created_by=user.id)
+        if "channel" in message_json:
+            message = Message(name=message_json["message_name"], message=message_json["message_text"],
+                              created_by=user.id, channel=message_json["channel"])
+        else:
+            message = Message(name=message_json["message_name"], message=message_json["message_text"],
+                              created_by=user.id, direct_user_email=message_json["direct_user_email"])
         db.session.add(message)
         db.session.commit()
 
@@ -174,7 +172,7 @@ def validate_add_workflow_request(request):  # todo: Simon can it be done cleane
     return {"status": True}
 
 
-@app.route("/add_workflow/api", methods=['GET', 'POST'])
+@app.route("/api/add_workflow", methods=['GET', 'POST'])
 @api_auth
 def add_workflow():
     """
@@ -233,22 +231,24 @@ def validate_add_workspace_request(request):  # todo: Simon can it be done clean
 def create_workspace_messages(workspace_id, start_time, workflow_id):
     workflow_messages = WorkflowMessage.query.filter_by(workflow_id=workflow_id)
 
-    for workflow_meesage in workflow_messages:
+    for workflow_message in workflow_messages:
 
-        execute_time = start_time + timedelta(days=workflow_meesage.time_from_start_days,
-                                              hours=workflow_meesage.time_from_start_hours)
+        execute_time = start_time + timedelta(days=workflow_message.time_from_start_days,
+                                              hours=workflow_message.time_from_start_hours)
 
-        if execute_time < datetime.utcnow() + timedelta(minutes=1):
+        if execute_time + timedelta(minutes=1) < datetime.utcnow():
             # todo: add logic role
-            pass
+            print("You want to set a message before the current time?")
         else:
             workspace_message = WorkspaceMessage(time_utc=execute_time, status=0,
-                                                 workspace_id=workspace_id, message_id=workflow_meesage.id,
-                                                 workflow_message_id=workflow_meesage.id) # todo check status =0 and not False
+                                                 workspace_id=workspace_id, message_id=workflow_message.id,
+                                                 workflow_message_id=workflow_message.id)  # todo check status =0 and not False
+            print(workspace_message)
             db.session.add(workspace_message)
+            db.session.commit()
 
 
-@app.route("/add_workspace/api", methods=['GET', 'POST'])
+@app.route("/api/add_workspace", methods=['GET', 'POST'])
 @api_auth
 def add_workspace():
     """
@@ -262,20 +262,17 @@ def add_workspace():
 
     if request.is_json:
         user = UserTable.query.filter_by(username=request.authorization.username).first()
-
         workspace_json = request.get_json()
         workspace_start_time = datetime.strptime(workspace_json["start_date"], '%d/%m/%y %H:%M')
-        hashed_token = bcrypt.generate_password_hash(workspace_json["start_date"]).decode('utf-8')
         workspace = Workspace(name=workspace_json["workspace_name"],
                               start_date=workspace_start_time,
-                              token=hashed_token,
-                              created_by=user.id)
+                              token=workspace_json["token"],
+                              created_by=user.id)  # todo: Guy encrypt token
         db.session.add(workspace)
-
+        db.session.commit()
 
         workspace_id = Workspace.query.filter_by(name=workspace_json["workspace_name"]).first().id
 
-        create_workspace_messages(workspace_id,workspace_start_time,workspace_json["workflow_id"])
+        create_workspace_messages(workspace_id, workspace_start_time, workspace_json["workflow_id"])
 
-        db.session.commit()
-        return f"Workspace created successfully. It's id is: {workspace_id}, and it's messages id are" #todo: change
+        return f"Workspace created successfully. It's id is: {workspace_id}, and it's messages id are"  # todo: change

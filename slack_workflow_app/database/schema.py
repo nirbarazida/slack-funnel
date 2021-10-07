@@ -3,6 +3,7 @@ from datetime import datetime
 from flask_login import UserMixin
 from sqlalchemy.orm import relationship
 
+
 @login_manager.user_loader
 def load_user(user_id):
     return UserTable.query.get(int(user_id))
@@ -44,19 +45,20 @@ class UserTable(db.Model, UserMixin):
         except AttributeError:
             raise NotImplementedError('No `id` attribute - override `get_id`')
 
-class Workspace(db.Model):
+
+class Workspace(db.Model):  # todo: add field for challenge leader id
     __tablename__ = 'workspaces'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(30), nullable=False, unique=True)
     start_date = db.Column(db.DateTime(), default=datetime.utcnow)
-    token = db.Column(db.String(150), nullable=False, unique=True)
+    token = db.Column(db.String(150), nullable=False, unique=True) # todo: move to different table
 
     # many 2 many: Workspace -> WorkspaceMessage <- Message
     message = relationship("WorkspaceMessage", backref='workspace')
 
     # one 2 many: 1 workflow - workspace N
     workflow_id = db.Column(db.Integer, db.ForeignKey('workflows.id'))
-    workflow = relationship("Workflow",back_populates="workspace")
+    workflow = relationship("Workflow", back_populates="workspace")
 
     created_by = db.Column(db.String(30), nullable=False)
 
@@ -70,7 +72,7 @@ class Workflow(db.Model):
     message = relationship("WorkflowMessage", backref='workflow')
 
     # one 2 many - 1 workflow - workspace N
-    workspace = relationship("Workspace",back_populates="workflow")
+    workspace = relationship("Workspace", back_populates="workflow")
 
     created_by = db.Column(db.String(30), nullable=False)
 
@@ -88,11 +90,14 @@ class WorkflowMessage(db.Model):
     # one 2 one - WorkflowMessage (ID) - WorkspaceMessage (NonID)
     workspace_message = relationship('WorkspaceMessage', backref='workflowmessage', uselist=False)
 
+
 class Message(db.Model):
     __tablename__ = 'messages'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(30), nullable=False, unique=True)
     message = db.Column(db.String(2000), nullable=False, unique=True)
+    channel = db.Column(db.String(30))
+    direct_user_email = db.Column(db.String(30))
 
     # many 2 many - Workspace -> WorkspaceMessage <- Message
     workspace = relationship("WorkspaceMessage", backref='message')
@@ -102,11 +107,12 @@ class Message(db.Model):
 
     created_by = db.Column(db.String(30), nullable=False)
 
+
 class WorkspaceMessage(db.Model):
     __tablename__ = 'workspace_messages'
     id = db.Column(db.Integer, primary_key=True)
     time_utc = db.Column(db.DateTime(), nullable=False)
-    status = db.Column(db.Boolean, default=0)  # todo check that it works + fill with 0 or 1 not T/F
+    status = db.Column(db.Boolean, default=0)  # todo: fill with 0 or 1 not T/F, Don't need it for now because I'm deleting the message.
 
     # many 2 many - Workspace -> WorkspaceMessage <- Message
     workspace_id = db.Column(db.Integer(), db.ForeignKey("workspaces.id"))

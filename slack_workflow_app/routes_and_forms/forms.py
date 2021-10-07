@@ -35,7 +35,7 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Login')
 
 
-class NewMessageForm(FlaskForm):
+class NewMessageForm(FlaskForm): #todo: add channel and direct_user_email
     message_name = StringField('Message name', validators=[DataRequired(), Length(min=2, max=30)])
     message = TextAreaField('Message', validators=[DataRequired(), Length(min=2, max=2000)])
     submit = SubmitField('Save')
