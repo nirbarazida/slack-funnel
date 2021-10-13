@@ -6,7 +6,7 @@ from slack_workflow_app.database.schema import UserTable, Workspace, Workflow, W
 from flask_login import login_user, current_user, logout_user, login_required
 from datetime import datetime, timedelta
 from functools import wraps
-from slack_workflow_app.const import DATE_TIME_FORMAT_FORM, DATE_TIME_FORMAT_DB,posts
+from slack_workflow_app.const import DATE_TIME_FORMAT_FORM, DATE_TIME_FORMAT_DB, posts
 from slack_sdk import WebClient, errors
 from slack_workflow_app.secret_const import CLIENT_ID, CLIENT_SECRET
 import json
@@ -143,26 +143,6 @@ def validate_add_workspace_request(request):  # todo: Simon can it be done clean
     return {"status": True}
 
 
-def create_workspace_messages(workspace_id, start_time, workflow_id):
-    workflow_messages = WorkflowMessage.query.filter_by(workflow_id=workflow_id)
-
-    for workflow_message in workflow_messages:
-
-        execute_time = start_time + timedelta(days=workflow_message.time_from_start_days,
-                                              hours=workflow_message.time_from_start_hours)
-
-        if execute_time + timedelta(minutes=1) < datetime.utcnow():
-            # todo: add logic role
-            print("You want to set a message before the current time?")
-        else:
-            workspace_message = WorkspaceMessage(time_utc=execute_time, status=0,
-                                                 workspace_id=workspace_id, message_id=workflow_message.id,
-                                                 workflow_message_id=workflow_message.id)  # todo check status =0 and not False
-            print(workspace_message)
-            db.session.add(workspace_message)
-            db.session.commit()
-
-
 @app.route("/api/AddWorkspace", methods=['POST'])
 @api_auth
 def add_workspace_api():
@@ -188,6 +168,34 @@ def add_workspace_api():
 
         workspace_id = Workspace.query.filter_by(name=workspace_json["workspace_name"]).first().id
 
-        create_workspace_messages(workspace_id, workspace_start_time, workspace_json["workflow_id"])
+        return f"Workspace created successfully. It's id is: {workspace_id}"  # todo: change
 
-        return f"Workspace created successfully. It's id is: {workspace_id}, and it's messages id are"  # todo: change
+
+def _create_workspace_messages(workspace_id, start_time, workflow_id):
+    workflow_messages = WorkflowMessage.query.filter_by(workflow_id=workflow_id)
+
+    for workflow_message in workflow_messages:
+
+        execute_time = start_time + timedelta(days=workflow_message.time_from_start_days,
+                                              hours=workflow_message.time_from_start_hours)
+
+        if execute_time + timedelta(minutes=1) < datetime.utcnow():
+            # todo: add logic role
+            print("You want to set a message before the current time?")
+        else:
+            workspace_message = WorkspaceMessage(time_utc=execute_time, status=0,
+                                                 workspace_id=workspace_id, message_id=workflow_message.id,
+                                                 workflow_message_id=workflow_message.id)  # todo check status =0 and not False
+            print(workspace_message)
+            db.session.add(workspace_message)
+            db.session.commit()
+
+
+@app.route("/api/CreateWorkflowForWorkspace", methods=['POST'])
+@api_auth
+def create_workflow_for_workspace_api():
+    if request.is_json:
+        workspace_messages_json = request.get_json()
+        workspace = Workspace.query.filter_by(name=workspace_messages_json["workspace_name"]).first()
+
+        _create_workspace_messages(workspace.id, workspace.start_date, workspace_messages_json["workflow_id"])
