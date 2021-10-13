@@ -1,0 +1,86 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section">
+    <form method="POST" action="">
+        {{ form.hidden_tag() }}
+        <fieldset class="form-group">
+            <legend class="border-bottom mb-4">{{ legend }}</legend>
+
+            <div class="form-group">
+                {{ form.workspace_name.label(class="form-control-label") }}
+                {% if form.workspace_name.errors %}
+                    {{ form.workspace_name(class="form-control form-control-lg is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.workspace_name.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.workspace_name(class="form-control form-control-lg") }}
+                {% endif %}
+            </div>
+
+
+            <div class="form-group">
+                {{ form.start_date.label(class="form-control-label") }}
+                {% if form.start_date.errors %}
+                    {{ form.start_date(class="form-control form-control-lg is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.start_date.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.start_date(class="form-control form-control-lg") }}
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                {{ form.code_for_token.label(class="form-control-label") }}
+                {% if form.code_for_token.errors %}
+                    {{ form.code_for_token(class="form-control form-control-lg is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.code_for_token.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.code_for_token(class="form-control form-control-lg") }}
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                {{ form.client_id.label(class="form-control-label") }}
+                {% if form.client_id.errors %}
+                    {{ form.client_id(class="form-control form-control-lg is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.client_id.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.client_id(class="form-control form-control-lg") }}
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                {{ form.client_secret.label(class="form-control-label") }}
+                {% if form.client_secret.errors %}
+                    {{ form.client_secret(class="form-control form-control-lg is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.client_secret.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.client_secret(class="form-control form-control-lg") }}
+                {% endif %}
+            </div>
+
+        </fieldset>
+        <div class="form-group">
+            {{ form.submit(class="btn btn-outline-info") }}
+        </div>
+    </form>
+</div>
+{% endblock content %}

@@ -129,4 +129,5 @@ dmypy.json
 .pyre/
 .idea
 *.db
-inner_tests/
+inner_tests/secret_const.py
+slack_workflow_app/secret_const.py

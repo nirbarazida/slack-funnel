@@ -1,30 +1,21 @@
 from flask import render_template, url_for, flash, redirect, request, jsonify
-from slack_workflow_app.routes_and_forms.forms import RegistrationForm, LoginForm, NewMessageForm
+from slack_workflow_app.routes_and_forms.forms import RegistrationForm, LoginForm, NewMessageForm, NewMWorkspaceForm
 from slack_workflow_app import app, db, bcrypt
 from slack_workflow_app.database.schema import UserTable, Workspace, Workflow, WorkflowMessage, Message, \
     WorkspaceMessage
 from flask_login import login_user, current_user, logout_user, login_required
 from datetime import datetime, timedelta
 from functools import wraps
+from slack_workflow_app.const import DATE_TIME_FORMAT_FORM, DATE_TIME_FORMAT_DB,posts
+from slack_sdk import WebClient, errors
+from slack_workflow_app.secret_const import CLIENT_ID, CLIENT_SECRET
+import json
 
 # todo: use bcrypt for the tokens
 # todo: add login_required to relevent pages
 
 
-posts = [
-    {
-        'author': 'Corey Schafer',
-        'title': 'Blog Post 1',
-        'content': 'First post content',
-        'date_posted': 'April 20, 2018'
-    },
-    {
-        'author': 'Jane Doe',
-        'title': 'Blog Post 2',
-        'content': 'Second post content',
-        'date_posted': 'April 21, 2018'
-    }
-]
+
 
 
 @app.route("/")
@@ -82,7 +73,7 @@ def account():
     return render_template('account/account.html', title='Account')
 
 
-@app.route("/add_message", methods=['GET', 'POST'])
+@app.route("/AddMessage", methods=['GET', 'POST'])
 @login_required
 def add_message():  # todo: add channel and direct_user_email
     form = NewMessageForm()
@@ -92,187 +83,55 @@ def add_message():  # todo: add channel and direct_user_email
         db.session.commit()
         flash('Your message has been created!', 'success')
         return redirect(url_for('home'))
-    return render_template('add_message/add_message.html', title='New Message', form=form, legend='New Message')
+    return render_template('AddMessage/AddMessage.html', title='New Message', form=form, legend='New Message')
 
 
-############# API ###############
-
-def api_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-
-        if auth:
-            user = UserTable.query.filter_by(username=auth.username).first()
-            if user and bcrypt.check_password_hash(user.password, auth.password):
-                return f(*args, **kwargs)
-
-        return 'Could not verify your login information. Please add auth=(username, password) to your request'
-
-    return decorated
+def convert_slack_sdk_to_json(response):
+    # todo BUG: slack-sdk has a bug that the error retunns an object and not a jsom
+    return response[response.index("{"): response.rfind("}") + 1].replace("'", '"').lower().replace("none","null")
 
 
-def validate_add_message_request(request):  # todo: Simon can it be done cleaner?
-    """Validation function for the API request"""
+def extract_token(code, client_id, client_secret):  # todo: save the client & client_secret on diffrent table
 
-    message_json = request.get_json()
-    # Workflow name exist in DB
+    client = WebClient()
 
-    if Message.query.filter_by(name=message_json["message_name"]).first():
-        return {"status": False, "message": "Message name already exist in the database"}
-
-    if Message.query.filter_by(message=message_json["message_text"]).first():
-        return {"status": False, "message": "Message content already exist in the database"}
-
-    return {"status": True}
-
-
-@app.route("/api/add_message", methods=['POST'])
-@api_auth
-def add_message_api():
-    input_validation = validate_add_message_request(request)
-
-    if input_validation["status"] == False:
-        return input_validation["message"]
-
-    if request.is_json:
-        message_json = request.get_json()
-        user = UserTable.query.filter_by(username=request.authorization.username).first()
-        if "channel" in message_json:
-            message = Message(name=message_json["message_name"], message=message_json["message_text"],
-                              created_by=user.id, channel=message_json["channel"])
-        else:
-            message = Message(name=message_json["message_name"], message=message_json["message_text"],
-                              created_by=user.id, direct_user_email=message_json["direct_user_email"])
-        db.session.add(message)
-        db.session.commit()
-
-        message_id = Message.query.filter_by(name=message_json["message_name"]).first().id
-
-        return f"Message created successfully. It's id is: {message_id}"
-
-    else:
-        return f"Please add a proper json with message_name, message_text"
+    try:
+        response = client.oauth_v2_access(
+            code=code,
+            client_id=client_id,
+            client_secret=client_secret)
+        return json.loads(convert_slack_sdk_to_json(str(response)))
+    except errors.SlackApiError as e:
+        return json.loads(convert_slack_sdk_to_json(str(e)))
 
 
-def validate_add_workflow_request(request):  # todo: Simon can it be done cleaner?
-    """Validation function for the API request"""
-
-    workflow_json = request.get_json()
-    # Workflow name exist in DB
-
-    if Workflow.query.filter_by(name=workflow_json["workflow_name"]).first():
-        return {"status": False, "message": "workflow name already exist in the database"}
-
-    # Workflow id doesn't exist in DB
-    for message in workflow_json['workflow_messages']:
-        if Message.query.filter_by(id=message['message_id']).first() is None:
-            return {"status": False, "message": "message doesn't exist in the database"}
-
-    return {"status": True}
-
-
-@app.route("/api/add_workflow", methods=['GET', 'POST'])
-@api_auth
-def add_workflow():
-    """
-    import requests
-    workflow = {"workflow_name": "Omdena basic 5",
-                "workflow_messages":
-                                    [{"message_id": 1, "time_from_start_days": 5, "time_from_start_hours": 1},
-                                     {"message_id": 2, "time_from_start_days": 7, "time_from_start_hours": 0}]}
-
-    resp = requests.post("http://127.0.0.1:5000/add_workflow/api", json=workflow,auth=('nir@dagshub.com', '123'))
-    print(str(resp.content))
-    """
-    input_validation = validate_add_workflow_request(request)
-
-    if input_validation["status"] == False:
-        return input_validation["message"]
-
-    if request.is_json:
-        user = UserTable.query.filter_by(username=request.authorization.username).first()
-
-        workflow_json = request.get_json()
-        workflow = Workflow(name=workflow_json["workflow_name"],
-                            created_by=user.id)
-        db.session.add(workflow)
-        db.session.commit()
-
-        workflow_id = Workflow.query.filter_by(name=workflow_json["workflow_name"]).first().id
-
-        for message in workflow_json['workflow_messages']:
-            workflowmessage = WorkflowMessage(workflow_id=workflow_id, message_id=message['message_id'],
-                                              time_from_start_days=message['time_from_start_days'],
-                                              time_from_start_hours=message['time_from_start_hours'])
-            db.session.add(workflowmessage)
-            db.session.commit()
-
-        return f"Workflow created successfully. It's id is: {workflow_id}"
-    else:
-        return redirect(url_for('home'))  # todo: show informative message before redirect
-
-
-def validate_add_workspace_request(request):  # todo: Simon can it be done cleaner?
-    """Validation function for the API request"""
-
-    workspace_json = request.get_json()
-    # Workflow name exist in DB
-
-    if Workspace.query.filter_by(name=workspace_json["workspace_name"]).first():
-        return {"status": False, "message": "workspace name already exist in the database"}
-
-    if Workflow.query.filter_by(id=workspace_json["workflow_id"]).first() is None:
-        return {"status": False, "message": "workflow id doesn't exist in the database"}
-
-    return {"status": True}
-
-
-def create_workspace_messages(workspace_id, start_time, workflow_id):
-    workflow_messages = WorkflowMessage.query.filter_by(workflow_id=workflow_id)
-
-    for workflow_message in workflow_messages:
-
-        execute_time = start_time + timedelta(days=workflow_message.time_from_start_days,
-                                              hours=workflow_message.time_from_start_hours)
-
-        if execute_time + timedelta(minutes=1) < datetime.utcnow():
-            # todo: add logic role
-            print("You want to set a message before the current time?")
-        else:
-            workspace_message = WorkspaceMessage(time_utc=execute_time, status=0,
-                                                 workspace_id=workspace_id, message_id=workflow_message.id,
-                                                 workflow_message_id=workflow_message.id)  # todo check status =0 and not False
-            print(workspace_message)
-            db.session.add(workspace_message)
-            db.session.commit()
-
-
-@app.route("/api/add_workspace", methods=['GET', 'POST'])
-@api_auth
+@app.route("/AddWorkspace", methods=['GET', 'POST'])
+@login_required
 def add_workspace():
-    """
-    {"workspace_name":"", "start_date":"%d/%m/%y %H:%M","token":"",workflow_id:""}
-    :return:
-    """
-    input_validation = validate_add_workspace_request(request)
+    form = NewMWorkspaceForm()
+    if form.validate_on_submit():
+        # datetime.strptime(format_start_date_str, DATE_TIME_FORMAT_DB)
 
-    if input_validation["status"] == False:
-        return input_validation["message"]
+        # format_start_date_str = form.start_date.data.strftime(
+        #     DATE_TIME_FORMAT_DB)  # todo BUG: due to bag - When sending the form it doesn't recognize any other format than "%Y-%m-%dT%H:%M", but this format gives errors wit SQL alchemy so I convet it back to the DB format
+        client_id = form.client_id.data if form.client_id.data else CLIENT_ID
+        client_secret = form.client_secret.data if form.client_id.data else CLIENT_SECRET
 
-    if request.is_json:
-        user = UserTable.query.filter_by(username=request.authorization.username).first()
-        workspace_json = request.get_json()
-        workspace_start_time = datetime.strptime(workspace_json["start_date"], '%d/%m/%y %H:%M')
-        workspace = Workspace(name=workspace_json["workspace_name"],
-                              start_date=workspace_start_time,
-                              token=workspace_json["token"],
-                              created_by=user.id)  # todo: Guy encrypt token
+        response = extract_token(form.code_for_token.data, client_id, client_secret)
+
+        if not response["ok"]:
+            flash(f'{response["error"]}', 'danger')
+            return redirect(url_for('add_workspace'))
+
+        workspace = Workspace(name=form.workspace_name.data,
+                              start_date=form.start_date.data, token=response["authed_user"]["access_token"],
+                              created_by=current_user.id)
+
         db.session.add(workspace)
         db.session.commit()
+        flash('The workspace has been created!', 'success')
+        return redirect(url_for('home'))
+    return render_template('AddWorkspace/AddWorkspace.html', title='New Workspace', form=form, legend='New Workspace')
 
-        workspace_id = Workspace.query.filter_by(name=workspace_json["workspace_name"]).first().id
 
-        create_workspace_messages(workspace_id, workspace_start_time, workspace_json["workflow_id"])
 
-        return f"Workspace created successfully. It's id is: {workspace_id}, and it's messages id are"  # todo: change

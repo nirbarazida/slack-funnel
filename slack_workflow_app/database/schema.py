@@ -50,8 +50,9 @@ class Workspace(db.Model):  # todo: add field for challenge leader id
     __tablename__ = 'workspaces'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(30), nullable=False, unique=True)
-    start_date = db.Column(db.DateTime(), default=datetime.utcnow)
+    start_date = db.Column(db.DateTime(), nullable=False)
     token = db.Column(db.String(150), nullable=False, unique=True) # todo: move to different table
+    created_by = db.Column(db.String(30), nullable=False)
 
     # many 2 many: Workspace -> WorkspaceMessage <- Message
     message = relationship("WorkspaceMessage", backref='workspace')
@@ -60,7 +61,7 @@ class Workspace(db.Model):  # todo: add field for challenge leader id
     workflow_id = db.Column(db.Integer, db.ForeignKey('workflows.id'))
     workflow = relationship("Workflow", back_populates="workspace")
 
-    created_by = db.Column(db.String(30), nullable=False)
+
 
 
 class Workflow(db.Model):
@@ -97,7 +98,8 @@ class Message(db.Model):
     name = db.Column(db.String(30), nullable=False, unique=True)
     message = db.Column(db.String(2000), nullable=False, unique=True)
     channel = db.Column(db.String(30))
-    direct_user_email = db.Column(db.String(30))
+    direct_user_id = db.Column(db.String(30))
+    created_by = db.Column(db.String(20), nullable=False)
 
     # many 2 many - Workspace -> WorkspaceMessage <- Message
     workspace = relationship("WorkspaceMessage", backref='message')
@@ -105,7 +107,7 @@ class Message(db.Model):
     # many 2 many - Workflow -> WorkflowMessage <- Message
     workflow = relationship("WorkflowMessage", backref='message')
 
-    created_by = db.Column(db.String(30), nullable=False)
+
 
 
 class WorkspaceMessage(db.Model):

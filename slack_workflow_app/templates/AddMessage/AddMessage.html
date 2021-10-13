@@ -5,6 +5,7 @@
         {{ form.hidden_tag() }}
         <fieldset class="form-group">
             <legend class="border-bottom mb-4">{{ legend }}</legend>
+
             <div class="form-group">
                 {{ form.message_name.label(class="form-control-label") }}
                 {% if form.message_name.errors %}
@@ -18,6 +19,36 @@
                     {{ form.message_name(class="form-control form-control-lg") }}
                 {% endif %}
             </div>
+
+
+            <div class="form-group">
+                {{ form.channel.label(class="form-control-label") }}
+                {% if form.channel.errors %}
+                    {{ form.channel(class="form-control form-control-lg is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.channel.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.channel(class="form-control form-control-lg") }}
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                {{ form.direct_user_id.label(class="form-control-label") }}
+                {% if form.direct_user_id.errors %}
+                    {{ form.direct_user_id(class="form-control form-control-lg is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.direct_user_id.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.direct_user_id(class="form-control form-control-lg") }}
+                {% endif %}
+            </div>
+
             <div class="form-group">
                 {{ form.message.label(class="form-control-label") }}
                 {% if form.message.errors %}

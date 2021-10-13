@@ -53,7 +53,7 @@ def send_msg(workspace_message):
         if message.channel:
             try:
                 response = client.chat_postMessage(channel='#'+message.channel, text=message.message,
-                                                   as_user=True, username="Nir Barazida")
+                                                   as_user=True)
                 print(f"Message send with response: {response}")
 
             except SlackApiError as e:
@@ -64,10 +64,11 @@ def send_msg(workspace_message):
 
         #send DM
         else:
-            user_info = client.users_lookupByEmail(email="nir@dagshub.com")
+
+            # user_info = client.users_lookupByEmail(email="nir@dagshub.com") #todo: delete
             try:
-                response = client.chat_postMessage(channel=user_info['user']['id'], text=message.message,
-                                                   as_user=True, username="Nir Barazida")
+                response = client.chat_postMessage(channel=message.direct_user_id, text=message.message,
+                                                   as_user=True)
 
                 print(f"Message send with response: {response}")
 
